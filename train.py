@@ -627,7 +627,7 @@ def run_training(config, dataset_config, args, rank, local_rank, world_size, dev
                 device_ids=[local_rank],
                 output_device=local_rank,
                 broadcast_buffers=False,
-                find_unused_parameters=False,
+                find_unused_parameters=True,
             )
 
         optimizer = torch.optim.Adam(student_network.parameters(), lr=float(config["train"]["learning_rate"]))
