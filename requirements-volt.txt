@@ -1,0 +1,4 @@
+# Torch, torchvision, OpenCV, PyYAML, scikit-image, sklearn and W&B are
+# provided by the H100-compatible /opt/venv image.
+natsort==8.4.0
+lpips==0.1.4

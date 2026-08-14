@@ -1,0 +1,60 @@
+{
+  "name": "reddit_dll_2step",
+  "seed": 1337,
+  "teacher_checkpoint": "/volt/artifacts/gsad_dll_degiac9yh1lt/inputs/step_0450000.pt",
+  "teacher_s3_uri": "s3://aair-reuper01/checkpoints/gsad_dll_cf1h53kibue3/diffusion/checkpoints/step_0450000.pt",
+  "output_dir": "/volt/artifacts/reddit_dll_degiac9yh1lt",
+  "model": {
+    "unet": {
+      "in_channel": 6,
+      "out_channel": 3,
+      "inner_channel": 64,
+      "channel_multiplier": [1, 1, 2, 2, 4],
+      "attn_res": [16],
+      "res_blocks": 2,
+      "dropout": 0,
+      "norm_groups": 32,
+      "image_size": 128
+    },
+    "schedule": {
+      "schedule": "linear",
+      "source_n_timestep": 500,
+      "master_n_timestep": 512,
+      "linear_start": 0.0001,
+      "linear_end": 0.02
+    },
+    "loss": {
+      "w_refinement": 0.8,
+      "w_pixel": 1.0,
+      "w_perceptual": 0.6,
+      "w_structural": 0.0
+    }
+  },
+  "progressive": {
+    "stages": [512, 256, 128, 64, 32, 16, 8, 4, 2],
+    "iterations_per_stage": 5000
+  },
+  "train": {
+    "learning_rate": 0.0001,
+    "lr_constant_steps": 2000,
+    "lr_decay_steps": 3000,
+    "ema_decay": 0.9999,
+    "gradient_clip": 1.0,
+    "log_frequency": 10,
+    "checkpoint_frequency": 500
+  },
+  "validation": {
+    "width": 2560,
+    "height": 1920,
+    "teacher_baseline_nfe": 500,
+    "teacher_candidate_nfe": 512,
+    "max_psnr_drop_db": 0.2,
+    "seed": 1337
+  },
+  "wandb": {
+    "project": "Reddit",
+    "name": "Reddit",
+    "id": "reddit-degiac9yh1lt",
+    "dir": "/volt/artifacts/wandb"
+  }
+}

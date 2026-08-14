@@ -1,0 +1,18 @@
+dataset: DLL
+datasets:
+  train:
+    root: /workspace/datasets/DLL_dataset/DLL_train_full
+    expected_pairs: 2970
+    batch_size: 16
+    n_workers: 4
+    patch_size: 96
+    use_crop: true
+    use_flip: true
+    use_rot: true
+    seed: 1337
+  val:
+    root: /workspace/datasets/DLL_dataset/DLL_val
+    expected_pairs: 24
+    batch_size: 1
+    n_workers: 1
+    seed: 1337
