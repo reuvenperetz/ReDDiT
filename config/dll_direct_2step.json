@@ -1,0 +1,53 @@
+{
+  "name": "reddit_dll_direct_2step",
+  "seed": 1337,
+  "model": {
+    "unet": {
+      "in_channel": 6,
+      "out_channel": 3,
+      "inner_channel": 64,
+      "channel_multiplier": [1, 1, 2, 2, 4],
+      "attn_res": [16],
+      "res_blocks": 2,
+      "dropout": 0,
+      "norm_groups": 32,
+      "image_size": 128
+    },
+    "schedule": {
+      "schedule": "linear",
+      "source_n_timestep": 500,
+      "master_n_timestep": 512,
+      "linear_start": 0.0001,
+      "linear_end": 0.02
+    },
+    "loss": {
+      "w_refinement": 0.0,
+      "w_pixel": 0.0,
+      "w_perceptual": 0.0,
+      "w_structural": 0.0
+    }
+  },
+  "direct": {
+    "student_nfe": 2,
+    "iterations": 2000,
+    "minimum_iterations": 200,
+    "learning_rate": 0.00001,
+    "ema_decay": 0.999,
+    "gradient_clip": 1.0,
+    "pixel_l1_weight": 1.0,
+    "pixel_mse_weight": 0.5,
+    "perceptual_weight": 0.1,
+    "log_frequency": 10,
+    "checkpoint_frequency": 100,
+    "validation_frequency": 100
+  },
+  "validation": {
+    "target_psnr": 15.0,
+    "mean_match": true,
+    "seed": 1337,
+    "precision": "bfloat16"
+  },
+  "wandb": {
+    "project": "Reddit"
+  }
+}

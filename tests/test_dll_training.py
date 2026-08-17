@@ -11,6 +11,7 @@ from torch import nn
 from data.DLL_dataset import DLLDataset
 from model.ddpm_modules.diffusion import GaussianDiffusion, make_beta_schedule, make_resampled_beta_schedule
 from train import ExponentialMovingAverage, extract_network_state
+from train_direct import match_prediction_mean_to_gt, pad_to_multiple
 
 
 class DLLDatasetTests(unittest.TestCase):
@@ -127,6 +128,25 @@ class CheckpointTests(unittest.TestCase):
         restored.load_state_dict(saved)
         self.assertEqual(set(restored.state_dict_cpu()), set(initial))
         self.assertTrue(torch.equal(restored.state_dict_cpu()["weight"], saved["weight"]))
+
+
+class DirectTrainingTests(unittest.TestCase):
+    def test_padding_preserves_original_region(self):
+        image = torch.arange(3 * 17 * 19, dtype=torch.float32).reshape(1, 3, 17, 19)
+        padded, original = pad_to_multiple(image, 16)
+        self.assertEqual(original, (17, 19))
+        self.assertEqual(tuple(padded.shape[-2:]), (32, 32))
+        self.assertTrue(torch.equal(padded[..., :17, :19], image))
+
+    def test_mean_matching_scales_each_image(self):
+        prediction = torch.full((2, 3, 8, 8), -0.5)
+        target = torch.stack(
+            [torch.full((3, 8, 8), 0.0), torch.full((3, 8, 8), 0.5)]
+        )
+        matched = match_prediction_mean_to_gt(prediction, target)
+        matched_mean = ((matched + 1.0) * 0.5).mean(dim=(1, 2, 3))
+        target_mean = ((target + 1.0) * 0.5).mean(dim=(1, 2, 3))
+        self.assertTrue(torch.allclose(matched_mean, target_mean))
 
 
 if __name__ == "__main__":

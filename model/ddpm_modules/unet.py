@@ -128,17 +128,20 @@ class SelfAttention(nn.Module):
 
         norm = self.norm(input)
         qkv = self.qkv(norm).view(batch, n_head, head_dim * 3, height, width)
-        query, key, value = qkv.chunk(3, dim=2)  # bhdyx
-
-        attn = torch.einsum(
-            "bnchw, bncyx -> bnhwyx", query, key
-        ).contiguous() / math.sqrt(channel)
-        attn = attn.view(batch, n_head, height, width, -1)
-        attn = torch.softmax(attn, -1)
-        attn = attn.view(batch, n_head, height, width, height, width)
-
-        out = torch.einsum("bnhwyx, bncyx -> bnchw", attn, value).contiguous()
-        out = self.out(out.view(batch, channel, height, width))
+        query, key, value = qkv.chunk(3, dim=2)
+        query = query.flatten(3).transpose(2, 3).contiguous()
+        key = key.flatten(3).transpose(2, 3).contiguous()
+        value = value.flatten(3).transpose(2, 3).contiguous()
+        out = F.scaled_dot_product_attention(
+            query,
+            key,
+            value,
+            dropout_p=0.0,
+            is_causal=False,
+            scale=1.0 / math.sqrt(channel),
+        )
+        out = out.transpose(2, 3).reshape(batch, channel, height, width)
+        out = self.out(out)
 
         return out + input
 
