@@ -87,6 +87,30 @@ def match_prediction_mean_to_gt(output, ground_truth):
 
 
 @torch.no_grad()
+def sample_mixed_precision(diffusion, low, initial_noise):
+    """Keep trajectory state in FP32 while evaluating the UNet in its own dtype."""
+    model_dtype = next(diffusion.denoise_fn.parameters()).dtype
+    x_t = initial_noise.float()
+    for step in range(diffusion.num_timesteps, 0, -1):
+        t_index = step * diffusion.time_scale
+        s_index = (step - 1) * diffusion.time_scale
+        alpha_t = diffusion.sqrt_alphas_cumprod[t_index].expand(low.shape[0], 1)
+        eps, _ = diffusion.denoise_fn(
+            torch.cat([low.to(model_dtype), x_t.to(model_dtype)], dim=1),
+            alpha_t.to(model_dtype),
+        )
+        eps = eps.float()
+        alpha_t_4d = diffusion._expand(alpha_t[:, 0])
+        x_0 = diffusion.predict_start(x_t, alpha_t_4d, eps).clamp(-1.0, 1.0)
+        eps = diffusion.predict_eps(x_t, x_0, alpha_t_4d)
+        x_t = (
+            diffusion.sqrt_alphas_cumprod[s_index] * x_0
+            + diffusion.sqrt_one_minus_alphas_cumprod[s_index] * eps
+        )
+    return x_t.clamp(-1.0, 1.0)
+
+
+@torch.no_grad()
 def evaluate_state(config, state, dataset, device, rank, world_size, limit=0, max_edge=0):
     model = core.build_unet(config)
     core.validate_and_load_network(model, state, "validation student")
@@ -95,7 +119,7 @@ def evaluate_state(config, state, dataset, device, rank, world_size, limit=0, ma
     model.to(device=device, dtype=dtype).eval()
     student_nfe = int(config["direct"]["student_nfe"])
     master_steps = int(config["model"]["schedule"]["master_n_timestep"])
-    diffusion = core.make_diffusion(config, model, student_nfe, master_steps).to(device=device, dtype=dtype).eval()
+    diffusion = core.make_diffusion(config, model, student_nfe, master_steps).to(device).eval()
     count_total = min(len(dataset), limit) if limit else len(dataset)
     sums = torch.zeros(6, dtype=torch.float64, device=device)
     for index in range(rank, count_total, world_size):
@@ -107,8 +131,8 @@ def evaluate_state(config, state, dataset, device, rank, world_size, limit=0, ma
         low = low.to(device=device, dtype=dtype)
         gt = gt.to(device=device, dtype=torch.float32)
         generator = torch.Generator(device=device).manual_seed(int(config["validation"]["seed"]) + index)
-        noise = torch.randn(low.shape, device=device, generator=generator, dtype=torch.float32).to(dtype)
-        output = diffusion.super_resolution(low, initial_noise=noise)[..., :height, :width].float()
+        noise = torch.randn(low.shape, device=device, generator=generator, dtype=torch.float32)
+        output = sample_mixed_precision(diffusion, low, noise)[..., :height, :width]
         finite = bool(torch.isfinite(output).all().item())
         if finite:
             raw_psnr, raw_ssim = core.metric_values(output, gt)
