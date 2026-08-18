@@ -11,7 +11,7 @@ from torch import nn
 from data.DLL_dataset import DLLDataset
 from model.ddpm_modules.diffusion import GaussianDiffusion, make_beta_schedule, make_resampled_beta_schedule
 from train import ExponentialMovingAverage, extract_network_state
-from train_direct import match_prediction_mean_to_gt, pad_to_multiple
+from train_direct import match_prediction_mean_to_gt, pad_to_multiple, target_metric_name
 
 
 class DLLDatasetTests(unittest.TestCase):
@@ -131,6 +131,10 @@ class CheckpointTests(unittest.TestCase):
 
 
 class DirectTrainingTests(unittest.TestCase):
+    def test_target_metric_can_select_raw_psnr(self):
+        config = {"validation": {"target_metric": "raw_psnr"}}
+        self.assertEqual(target_metric_name(config), "raw_psnr")
+
     def test_padding_preserves_original_region(self):
         image = torch.arange(3 * 17 * 19, dtype=torch.float32).reshape(1, 3, 17, 19)
         padded, original = pad_to_multiple(image, 16)

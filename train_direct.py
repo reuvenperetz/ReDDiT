@@ -38,6 +38,7 @@ def parse_args():
     parser.add_argument("--wandb-mode", choices=("online", "offline", "disabled"), default="online")
     parser.add_argument("--wandb-name", default="Reddit-2step")
     parser.add_argument("--wandb-id")
+    parser.add_argument("--target-metric", choices=("psnr", "raw_psnr"))
     return parser.parse_args()
 
 
@@ -54,7 +55,17 @@ def load_configs(args):
         dataset_config["datasets"]["val"]["root"] = args.val_root
     config["teacher_checkpoint"] = str(Path(args.teacher_checkpoint).resolve())
     config["output_dir"] = str(Path(args.output_dir).resolve())
+    if args.target_metric:
+        config["validation"]["target_metric"] = args.target_metric
+    config["validation"].setdefault("target_metric", "psnr")
     return config, dataset_config
+
+
+def target_metric_name(config):
+    name = config["validation"].get("target_metric", "psnr")
+    if name not in ("psnr", "raw_psnr"):
+        raise ValueError(f"Unsupported validation target metric: {name}")
+    return name
 
 
 def pad_to_multiple(tensor, multiple=16):
@@ -353,6 +364,7 @@ def run_training(config, dataset_config, args, rank, local_rank, world_size, dev
     validation_limit = args.validation_limit
     validation_max_edge = args.validation_max_edge
     target_psnr = float(config["validation"]["target_psnr"])
+    target_metric = target_metric_name(config)
 
     if step == 0:
         initial_metrics = evaluate_state(
@@ -443,7 +455,7 @@ def run_training(config, dataset_config, args, rank, local_rank, world_size, dev
                     limit=validation_limit,
                     max_edge=validation_max_edge,
                 )
-                improved = best_metrics is None or metrics["psnr"] > best_metrics["psnr"]
+                improved = best_metrics is None or metrics[target_metric] > best_metrics[target_metric]
                 if improved:
                     best_metrics = metrics
                     save_checkpoint(
@@ -474,9 +486,9 @@ def run_training(config, dataset_config, args, rank, local_rank, world_size, dev
                     LOGGER.info("2-NFE validation step=%d metrics=%s", step, json.dumps(metrics, sort_keys=True))
                     if run:
                         run.log({f"validation/{key}": value for key, value in metrics.items() if isinstance(value, (int, float))}, step=step)
-                        run.summary["best_psnr"] = best_metrics["psnr"]
+                        run.summary[f"best_{target_metric}"] = best_metrics[target_metric]
                         run.summary["best_checkpoint_path"] = str((checkpoint_dir / "best.pt").resolve())
-                if not smoke and step >= minimum_iterations and best_metrics["psnr"] >= target_psnr:
+                if not smoke and step >= minimum_iterations and best_metrics[target_metric] >= target_psnr:
                     stop = True
                     break
 
@@ -497,10 +509,11 @@ def run_training(config, dataset_config, args, rank, local_rank, world_size, dev
                 break
         epoch += 1
 
-    achieved = bool(best_metrics and best_metrics["psnr"] >= target_psnr)
+    achieved = bool(best_metrics and best_metrics[target_metric] >= target_psnr)
     if rank == 0:
         summary = {
             "achieved": achieved,
+            "target_metric": target_metric,
             "target_psnr": target_psnr,
             "best_metrics": best_metrics,
             "best_checkpoint": str((checkpoint_dir / "best.pt").resolve()),
@@ -513,7 +526,10 @@ def run_training(config, dataset_config, args, rank, local_rank, world_size, dev
             run.finish()
     core.barrier(world_size)
     if not smoke and not achieved:
-        raise RuntimeError(f"2-NFE target not reached: best_psnr={best_metrics['psnr']:.4f} < {target_psnr:.4f}")
+        raise RuntimeError(
+            f"2-NFE target not reached: {target_metric}="
+            f"{best_metrics[target_metric]:.4f} < {target_psnr:.4f}"
+        )
 
 
 def main():
