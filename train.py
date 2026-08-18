@@ -131,6 +131,11 @@ def extract_network_state(payload, prefer_ema=True):
         if not torch.is_tensor(value):
             continue
         normalized[_strip_network_prefix(key)] = value
+    for key, value in list(normalized.items()):
+        marker = ".res_block.noise_func.noise_func.0."
+        if marker in key:
+            legacy_key = key.replace(marker, ".res_block.mlp.1.")
+            normalized.setdefault(legacy_key, value)
     return normalized
 
 

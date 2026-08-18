@@ -103,6 +103,16 @@ class ScheduleTests(unittest.TestCase):
 
 
 class CheckpointTests(unittest.TestCase):
+    def test_restores_missing_legacy_resblock_mlp_alias(self):
+        weight = torch.ones(4, 3)
+        payload = {
+            "state_dict": {
+                "model.denoise_fn.downs.1.res_block.noise_func.noise_func.0.weight": weight,
+            }
+        }
+        state = extract_network_state(payload)
+        self.assertTrue(torch.equal(state["downs.1.res_block.mlp.1.weight"], weight))
+
     def test_extracts_ema_and_normalizes_network_prefix(self):
         payload = {
             "ema": {
