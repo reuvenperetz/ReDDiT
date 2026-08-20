@@ -390,10 +390,20 @@ def find_resume_checkpoint(config, resume):
     if resume != "auto":
         return Path(resume)
     pointer = Path(config["output_dir"]) / "latest.json"
-    if not pointer.is_file():
-        return None
-    with open(pointer, "r", encoding="utf-8") as handle:
-        return Path(json.load(handle)["checkpoint"])
+    pointer_checkpoint = None
+    if pointer.is_file():
+        with open(pointer, "r", encoding="utf-8") as handle:
+            pointer_checkpoint = Path(json.load(handle)["checkpoint"])
+    latest = Path(config["output_dir"]) / "latest.pt"
+    if latest.is_file() and (
+        pointer_checkpoint is None
+        or not pointer_checkpoint.is_file()
+        or latest.stat().st_mtime > pointer.stat().st_mtime
+    ):
+        return latest
+    if pointer_checkpoint is not None and pointer_checkpoint.is_file():
+        return pointer_checkpoint
+    return None
 
 
 def make_diffusion(config, network, num_steps, master_steps):

@@ -10,7 +10,7 @@ from torch import nn
 
 from data.DLL_dataset import DLLDataset
 from model.ddpm_modules.diffusion import GaussianDiffusion, make_beta_schedule, make_resampled_beta_schedule
-from train import ExponentialMovingAverage, extract_network_state, match_prediction_mean_to_gt, optional_float, pad_to_multiple, stage_transitions
+from train import ExponentialMovingAverage, extract_network_state, find_resume_checkpoint, match_prediction_mean_to_gt, optional_float, pad_to_multiple, stage_transitions
 
 
 class DLLDatasetTests(unittest.TestCase):
@@ -101,6 +101,16 @@ class ScheduleTests(unittest.TestCase):
 
 
 class CheckpointTests(unittest.TestCase):
+    def test_auto_resume_prefers_newer_in_progress_checkpoint(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            stage_final = root / "stage_final.pt"
+            stage_final.touch()
+            (root / "latest.json").write_text(json.dumps({"checkpoint": str(stage_final)}))
+            latest = root / "latest.pt"
+            latest.touch()
+            self.assertEqual(find_resume_checkpoint({"output_dir": directory}, "auto"), latest)
+
     def test_restores_missing_legacy_resblock_mlp_alias(self):
         weight = torch.ones(4, 3)
         payload = {
