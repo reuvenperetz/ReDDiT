@@ -1159,12 +1159,17 @@ def run_progressive_training(config, dataset_config, args, rank, local_rank, wor
         if resume_payload.get("kind") != "reddit_progressive_distillation":
             raise RuntimeError(f"Refusing incompatible resume checkpoint: {resume_path}")
         LOGGER.info("Resume candidate: %s stage=%s complete=%s", resume_path, resume_payload["stage_index"], resume_payload["stage_complete"])
-    global_step = int(resume_payload.get("global_step", 0)) if resume_payload else 0
     manifest_path = Path(config["output_dir"]) / "manifest.json"
     manifest = {}
     if manifest_path.is_file():
         with open(manifest_path, "r", encoding="utf-8") as handle:
             manifest = json.load(handle)
+    if resume_payload:
+        global_step = int(resume_payload.get("global_step", 0))
+    elif args.restart_reason:
+        global_step = int(manifest.get("global_step", 0))
+    else:
+        global_step = 0
     global_best_2 = optional_float(manifest.get("best_2nfe_raw_psnr"), "-inf")
     restart_count = int(manifest.get("restart_count", 0))
     if args.restart_reason:
