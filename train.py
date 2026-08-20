@@ -1076,6 +1076,10 @@ def public_metrics(metrics):
     return {key: value for key, value in metrics.items() if key != "per_image"}
 
 
+def optional_float(value, default):
+    return float(default if value is None else value)
+
+
 def run_progressive_training(config, dataset_config, args, rank, local_rank, world_size, device):
     gate = require_full_gate(config, args.smoke_steps)
     if not args.smoke_steps and world_size != 8:
@@ -1161,7 +1165,7 @@ def run_progressive_training(config, dataset_config, args, rank, local_rank, wor
     if manifest_path.is_file():
         with open(manifest_path, "r", encoding="utf-8") as handle:
             manifest = json.load(handle)
-    global_best_2 = float(manifest.get("best_2nfe_raw_psnr", "-inf"))
+    global_best_2 = optional_float(manifest.get("best_2nfe_raw_psnr"), "-inf")
     restart_count = int(manifest.get("restart_count", 0))
     if args.restart_reason:
         restart_count += 1

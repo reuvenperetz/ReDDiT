@@ -10,7 +10,7 @@ from torch import nn
 
 from data.DLL_dataset import DLLDataset
 from model.ddpm_modules.diffusion import GaussianDiffusion, make_beta_schedule, make_resampled_beta_schedule
-from train import ExponentialMovingAverage, extract_network_state, match_prediction_mean_to_gt, pad_to_multiple, stage_transitions
+from train import ExponentialMovingAverage, extract_network_state, match_prediction_mean_to_gt, optional_float, pad_to_multiple, stage_transitions
 
 
 class DLLDatasetTests(unittest.TestCase):
@@ -142,6 +142,9 @@ class ProgressiveTrainingTests(unittest.TestCase):
     def test_transition_plan(self):
         self.assertEqual(stage_transitions(16), [(16, 8), (8, 4), (4, 2)])
         self.assertEqual(stage_transitions(2), [(4, 2)])
+
+    def test_null_optional_metric_uses_default(self):
+        self.assertEqual(optional_float(None, "-inf"), float("-inf"))
 
     def test_padding_preserves_original_region(self):
         image = torch.arange(3 * 17 * 19, dtype=torch.float32).reshape(1, 3, 17, 19)
