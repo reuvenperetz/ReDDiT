@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -109,6 +110,8 @@ class CheckpointTests(unittest.TestCase):
             (root / "latest.json").write_text(json.dumps({"checkpoint": str(stage_final)}))
             latest = root / "latest.pt"
             latest.touch()
+            os.utime(root / "latest.json", (1, 1))
+            os.utime(latest, (2, 2))
             self.assertEqual(find_resume_checkpoint({"output_dir": directory}, "auto"), latest)
 
     def test_restores_missing_legacy_resblock_mlp_alias(self):
