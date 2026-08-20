@@ -251,6 +251,8 @@ class GaussianDiffusion(nn.Module):
         total = distill_loss + self.w_gt * pixel_loss + self.w_lpips * perceptual_loss
         parts = {
             "distill_loss": distill_loss.detach(),
+            "loss_x0": loss_x0.mean().detach(),
+            "loss_epsilon": loss_eps.mean().detach(),
             "pixel_loss": pixel_loss.detach(),
             "perceptual_loss": perceptual_loss.detach(),
         }

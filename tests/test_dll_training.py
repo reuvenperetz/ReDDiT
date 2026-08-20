@@ -10,8 +10,7 @@ from torch import nn
 
 from data.DLL_dataset import DLLDataset
 from model.ddpm_modules.diffusion import GaussianDiffusion, make_beta_schedule, make_resampled_beta_schedule
-from train import ExponentialMovingAverage, extract_network_state
-from train_direct import match_prediction_mean_to_gt, pad_to_multiple, target_metric_name
+from train import ExponentialMovingAverage, extract_network_state, match_prediction_mean_to_gt, pad_to_multiple, stage_transitions
 
 
 class DLLDatasetTests(unittest.TestCase):
@@ -62,10 +61,9 @@ class ScheduleTests(unittest.TestCase):
     def test_config_stages_halve_to_two(self):
         config_path = Path(__file__).parents[1] / "config" / "dll_train.json"
         config = json.loads(config_path.read_text())
-        stages = config["progressive"]["stages"]
-        self.assertEqual(stages[-1], 2)
-        self.assertTrue(all(left == right * 2 for left, right in zip(stages, stages[1:])))
-        self.assertEqual(config["progressive"]["iterations_per_stage"], 5000)
+        ladder = config["progressive"]["teacher_ladder"]
+        self.assertEqual(ladder, [2, 4, 8, 16, 32, 64, 128, 256, 512])
+        self.assertEqual(config["progressive"]["iterations_per_stage"], 20000)
 
     def test_two_to_one_loss_handles_zero_endpoint(self):
         class Denoiser(nn.Module):
@@ -140,10 +138,10 @@ class CheckpointTests(unittest.TestCase):
         self.assertTrue(torch.equal(restored.state_dict_cpu()["weight"], saved["weight"]))
 
 
-class DirectTrainingTests(unittest.TestCase):
-    def test_target_metric_can_select_raw_psnr(self):
-        config = {"validation": {"target_metric": "raw_psnr"}}
-        self.assertEqual(target_metric_name(config), "raw_psnr")
+class ProgressiveTrainingTests(unittest.TestCase):
+    def test_transition_plan(self):
+        self.assertEqual(stage_transitions(16), [(16, 8), (8, 4), (4, 2)])
+        self.assertEqual(stage_transitions(2), [(4, 2)])
 
     def test_padding_preserves_original_region(self):
         image = torch.arange(3 * 17 * 19, dtype=torch.float32).reshape(1, 3, 17, 19)
